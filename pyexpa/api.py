@@ -25,6 +25,15 @@ class APIUnavailableException(Exception):
         self.response = response
         self.error_message = error_message
 
+
+class PyEXPAException(Exception):
+    """
+        This error is raised whenever this module is not working as expected. If it shows up, it should be treated as a bug.
+    """
+    def __init__(self, error_message):
+        self.error_message = error_message
+
+
 class ExpaApi(object):
     """
     This class is meant to encapsulate and facilitate the development of
@@ -48,7 +57,7 @@ class ExpaApi(object):
         'gv': 1, 'gt': 2, 'get': [2, 5],
         'gx': [1, 2, 5], 'cx': [1, 2, 5], 'ge': 5}
 
-    def __init__(self, username, password, token=None, fail_attempts=1, fail_interval=10):
+    def __init__(self, username=None, password=None, token=None, fail_attempts=1, fail_interval=10):
         """
         Default method initialization.
         params?
@@ -64,7 +73,7 @@ class ExpaApi(object):
             self.token = token
             return
         params = {
-            'user[email]': account,
+            'user[email]': username,
             'user[password]':password,
             }
         s = requests.Session()
@@ -78,7 +87,7 @@ class ExpaApi(object):
             self.token = response.history[-1].cookies['expa_token']
             print(self.token)
         except KeyError:
-            raise DjangoEXPAException("Error obtaining the authentication token")
+            raise PyEXPAException("Error obtaining the authentication token")
 
     def _build_query(self, routes, query_params=None, version='v2'):
         """
@@ -90,7 +99,7 @@ class ExpaApi(object):
         """
         if query_params is None:
             query_params = {}
-        base_url = API_ENDPOINT + "{version}/{routes}?{params}"
+        base_url = self.API_ENDPOINT + "{version}/{routes}?{params}"
         query_params['access_token'] = self.token
         return base_url.format(version=version, routes="/".join(routes), params=urlencode(query_params, True))
 
@@ -99,9 +108,9 @@ class ExpaApi(object):
         This method both builds a query and executes it using the requests module. If it doesn't work because of EXPA issues, it will retry an amount of times equal to the 'fail_attempts' attribute before raising an APIUnavailableException
         """
         if method == "get":
-            query = self._buildQuery(routes, query_params, version)
+            query = self._build_query(routes, query_params, version)
         else:
-            query = self._buildQuery(routes, None, version)
+            query = self._build_query(routes, None, version)
         print(query)
         fail_attempts = self.fail_attempts
         # Tries the request until it works
@@ -130,6 +139,3 @@ class ExpaApi(object):
                     time.sleep(self.fail_interval)
 
         raise APIUnavailableException(response, error_message)
-
-
-
